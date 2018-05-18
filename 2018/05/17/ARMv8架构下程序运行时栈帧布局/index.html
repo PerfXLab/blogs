@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/blogs/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/blogs/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/blogs/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/blogs/images/apple-touch-icon-next2.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/blogs/images/apple-touch-icon-next2.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/blogs/images/apple-touch-icon-next2.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/blogs/images/apple-touch-icon-next2.png?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="ARMv8架构," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="ARMv8架构下程序运行时栈帧布局结合ARM相关文档和在飞腾机器上使用gdb调试实际程序来研究ARM的指令和运行时栈帧布局。主要参考了三篇文档。  Procedure Call Standard for the ARM 64-bit Architecture。参考其中的过程调用标准和运行时栈帧布局。  ARMv8 Instruction Set Overview。参考其中的指令概述。  ARM C">
+<meta name="keywords" content="ARMv8架构">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ARMv8架构下程序运行时栈帧布局">
+<meta property="og:url" content="https://github.com/PerfXLab/blogs/2018/05/17/ARMv8架构下程序运行时栈帧布局/index.html">
+<meta property="og:site_name" content="澎峰科技">
+<meta property="og:description" content="ARMv8架构下程序运行时栈帧布局结合ARM相关文档和在飞腾机器上使用gdb调试实际程序来研究ARM的指令和运行时栈帧布局。主要参考了三篇文档。  Procedure Call Standard for the ARM 64-bit Architecture。参考其中的过程调用标准和运行时栈帧布局。  ARMv8 Instruction Set Overview。参考其中的指令概述。  ARM C">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="https://github.com/blogs/2018/05/17/ARMv8架构下程序运行时栈帧布局/1.png">
+<meta property="og:image" content="https://github.com/blogs/2018/05/17/ARMv8架构下程序运行时栈帧布局/2.png">
+<meta property="og:image" content="https://github.com/blogs/2018/05/17/ARMv8架构下程序运行时栈帧布局/3.png">
+<meta property="og:image" content="https://github.com/blogs/2018/05/17/ARMv8架构下程序运行时栈帧布局/ewm.jpg">
+<meta property="og:updated_time" content="2018-05-18T10:59:16.335Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="ARMv8架构下程序运行时栈帧布局">
+<meta name="twitter:description" content="ARMv8架构下程序运行时栈帧布局结合ARM相关文档和在飞腾机器上使用gdb调试实际程序来研究ARM的指令和运行时栈帧布局。主要参考了三篇文档。  Procedure Call Standard for the ARM 64-bit Architecture。参考其中的过程调用标准和运行时栈帧布局。  ARMv8 Instruction Set Overview。参考其中的指令概述。  ARM C">
+<meta name="twitter:image" content="https://github.com/blogs/2018/05/17/ARMv8架构下程序运行时栈帧布局/1.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/blogs/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://github.com/PerfXLab/blogs/2018/05/17/ARMv8架构下程序运行时栈帧布局/"/>
+
+
+
+
+
+  <title>ARMv8架构下程序运行时栈帧布局 | 澎峰科技</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/blogs/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">澎峰科技</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/blogs/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/blogs/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/blogs/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/blogs/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://github.com/PerfXLab/blogs/blogs/2018/05/17/ARMv8架构下程序运行时栈帧布局/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/blogs/images/avatar.png">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="澎峰科技">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">ARMv8架构下程序运行时栈帧布局</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-05-17T11:14:30+08:00">
+                2018-05-17
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="ARMv8架构下程序运行时栈帧布局"><a href="#ARMv8架构下程序运行时栈帧布局" class="headerlink" title="ARMv8架构下程序运行时栈帧布局"></a>ARMv8架构下程序运行时栈帧布局</h2><p>结合ARM相关文档和在飞腾机器上使用gdb调试实际程序来研究ARM的指令和运行时栈帧布局。主要参考了三篇文档。</p>
+<ol>
+<li><p>Procedure Call Standard for the ARM 64-bit Architecture。参考其中的过程调用标准和运行时栈帧布局。</p>
+</li>
+<li><p>ARMv8 Instruction Set Overview。参考其中的指令概述。</p>
+</li>
+<li><p>ARM Compiler Migration and Compatibility Guide。参考其中ARM汇编与GNU汇编格式的比较。</p>
+</li>
+</ol>
+<p>在文章1中，对ARM架构下运行时栈帧布局如图1所示。</p>
+<img src="/blogs/2018/05/17/ARMv8架构下程序运行时栈帧布局/1.png">
+<center>图1 ARM运行时栈帧布局</center><br><br><br><br><br>其中，FP(x29)寄存器保存栈帧地址，LR（x30）保存当前过程的返回地址。栈是从高地址向低地址生长。为验证图中的布局形式，在飞腾机器上安装gdb，通过调试一个示例程序，来研究ARM的指令特点和栈帧结构。示例程序如图2所示，函数TestParam定义了两个局部变量，分别为数组和标量类型。<br><br><br><br><img src="/blogs/2018/05/17/ARMv8架构下程序运行时栈帧布局/2.png"><br><br><center>图2 示例程序</center><br><br><br>使用gdb调试图2中代码所产生的程序，然后再反汇编函数TestParam，可以得到如下结果。<br><br><font color="#0000FF" size="2"><br>&emsp;=&gt; 0x0000000000400680 &lt;+0&gt;:stpx29, x30, [sp,#-64]!<br><br>   &emsp;&emsp;0x0000000000400684 &lt;+4&gt;:movx29, sp<br><br>   &emsp;&emsp;0x0000000000400688 &lt;+8&gt;:strw0, [x29,#28]<br><br>   &emsp;&emsp;0x000000000040068c &lt;+12&gt;:strw1, [x29,#24]<br><br>   &emsp;&emsp;0x0000000000400690 &lt;+16&gt;:strw2, [x29,#20]<br><br>   &emsp;&emsp;0x0000000000400694 &lt;+20&gt;:strw3, [x29,#16]<br><br>   &emsp;&emsp;0x0000000000400698 &lt;+24&gt;:adrpx0, 0x411000<a href="mailto:&#95;&#95;&#108;&#x69;&#x62;&#x63;&#95;&#x73;&#116;&#x61;&#x72;&#116;&#x5f;&#x6d;&#97;&#x69;&#110;&#x40;&#103;&#x6f;&#116;&#x2e;&#112;&#108;&#x74;" target="_blank" rel="noopener">&#95;&#95;&#108;&#x69;&#x62;&#x63;&#95;&#x73;&#116;&#x61;&#x72;&#116;&#x5f;&#x6d;&#97;&#x69;&#110;&#x40;&#103;&#x6f;&#116;&#x2e;&#112;&#108;&#x74;</a><br><br>   &emsp;&emsp;0x000000000040069c &lt;+28&gt;:addx0, x0, #0x38<br><br>   &emsp;&emsp;0x00000000004006a0 &lt;+32&gt;:ldrx1, [x0]<br><br>   &emsp;&emsp;0x00000000004006a4 &lt;+36&gt;:strx1, <br><br>   &emsp;&emsp;0x00000000004006a8 &lt;+40&gt;:movx1, #0x0&emsp;&emsp;&emsp;// #0<br><br>   &emsp;&emsp;0x00000000004006ac &lt;+44&gt;:ldrw1, [x29,#28]<br><br>   &emsp;&emsp;0x00000000004006b0 &lt;+48&gt;:ldrw0, [x29,#24]<br><br>   &emsp;&emsp;0x00000000004006b4 &lt;+52&gt;:addw0, w1, w0<br><br>   &emsp;&emsp;0x00000000004006b8 &lt;+56&gt;:strw0, [x29,#48]<br><br>   &emsp;&emsp;0x00000000004006bc &lt;+60&gt;:ldrw1, [x29,#20]<br><br>   &emsp;&emsp;0x00000000004006c0 &lt;+64&gt;:ldrw0, [x29,#16]<br><br>   &emsp;&emsp;0x00000000004006c4 &lt;+68&gt;:subw0, w1, w0<br><br>   &emsp;&emsp;0x00000000004006c8 &lt;+72&gt;:strw0, [x29,#52]<br><br>   &emsp;&emsp;0x00000000004006cc &lt;+76&gt;:ldrw1, [x29,#20]<br><br>   &emsp;&emsp;0x00000000004006d0 &lt;+80&gt;:ldrw0, [x29,#16]<br><br>   &emsp;&emsp;0x00000000004006d4 &lt;+84&gt;:addw0, w1, w0<br><br>   &emsp;&emsp;0x00000000004006d8 &lt;+88&gt;:strw0, [x29,#44]<br><br>   &emsp;&emsp;0x00000000004006dc &lt;+92&gt;:ldrw1, [x29,#48]<br><br>   &emsp;&emsp;0x00000000004006e0 &lt;+96&gt;:ldrw2, [x29,#52]<br><br>   &emsp;&emsp;0x00000000004006e4 &lt;+100&gt;:adrpx0, 0x400000<br><br>   &emsp;&emsp;0x00000000004006e8 &lt;+104&gt;:addx0, x0, #0x808<br><br>   &emsp;&emsp;0x00000000004006ec &lt;+108&gt;:ldrw3, [x29,#44]<br><br>   &emsp;&emsp;0x00000000004006f0 &lt;+112&gt;:bl0x400530&lt;printf@plt&gt;<br><br>   &emsp;&emsp;0x00000000004006f4 &lt;+116&gt;:adrpx0, 0x411000<a href="mailto:&#x5f;&#95;&#x6c;&#105;&#98;&#x63;&#95;&#115;&#x74;&#x61;&#x72;&#x74;&#x5f;&#x6d;&#97;&#x69;&#x6e;&#x40;&#x67;&#111;&#116;&#x2e;&#x70;&#108;&#116;" target="_blank" rel="noopener">&#x5f;&#95;&#x6c;&#105;&#98;&#x63;&#95;&#115;&#x74;&#x61;&#x72;&#x74;&#x5f;&#x6d;&#97;&#x69;&#x6e;&#x40;&#x67;&#111;&#116;&#x2e;&#x70;&#108;&#116;</a><br><br>   &emsp;&emsp;0x00000000004006f8 &lt;+120&gt;:addx0, x0, #0x38<br><br>   &emsp;&emsp;0x00000000004006fc &lt;+124&gt;:ldrx1, [x29,#56]<br><br>   &emsp;&emsp;0x0000000000400700 &lt;+128&gt;:ldrx0, [x0]<br><br>   &emsp;&emsp;0x0000000000400704 &lt;+132&gt;:eorx0, x1, x0<br><br>   &emsp;&emsp;0x0000000000400708 &lt;+136&gt;:cmpx0, xzr<br><br>   &emsp;&emsp;0x000000000040070c &lt;+140&gt;:b.eq0x400714&lt;TestParam+148&gt;<br><br>   &emsp;&emsp;0x0000000000400710 &lt;+144&gt;:bl0x400500&lt;__stack_chk_fail@plt&gt;<br><br>   &emsp;&emsp;0x0000000000400714 &lt;+148&gt;:ldpx29, x30,[sp],#64<br><br>   &emsp;&emsp;0x0000000000400718 &lt;+152&gt;:ret<br><br></font><br><br><center>该程序在运行时的栈帧如图3所示。</center>
+
+<img src="/blogs/2018/05/17/ARMv8架构下程序运行时栈帧布局/3.png">
+<p>以下是反汇编指令的解释以及其对栈中内容的影响。<br><br></p>
+<font color="#0000FF" size="2"><br>&emsp;&emsp;=&gt; 0x0000000000400680 &lt;+0&gt;:stpx29, x30, [sp,#-64]!<br><br>&emsp;&emsp;0x0000000000400684 &lt;+4&gt;:movx29, sp<br></font>
+
+<p>指令stp把一对值x29和x30放到SP-64的地址（7ffffff370）中去。此时的SP是旧SP，其值为7ffffff3b0。值得注意的是，这条语句同时完成了SP的自减运算，也就是执行之后，SP的值也变成了7ffffff370。第二条指令把FP的值设置为与SP的值相同。</p>
+<font color="#0000FF" size="2"><br>  &emsp;&emsp;0x0000000000400688 &lt;+8&gt;:strw0, [x29,#28]<br><br>  &emsp;&emsp;0x000000000040068c &lt;+12&gt;:strw1, [x29,#24]<br><br>  &emsp;&emsp;0x0000000000400690 &lt;+16&gt;:strw2, [x29,#20]<br><br>  &emsp;&emsp;0x0000000000400694 &lt;+20&gt;:strw3, [x29,#16]<br><br></font><br>这4条指令把保存在参数传递寄存器中的4个参数保存到栈中。如图2中的w0, w1, w2, w3所示。<br><br><font color="#0000FF" size="2"><br>   &emsp;&emsp;0x0000000000400698 &lt;+24&gt;:adrpx0, 0x411000<a href="mailto:&#95;&#95;&#108;&#105;&#x62;&#x63;&#95;&#x73;&#116;&#97;&#114;&#x74;&#95;&#109;&#97;&#x69;&#110;&#64;&#103;&#x6f;&#116;&#x2e;&#x70;&#108;&#116;" target="_blank" rel="noopener">&#95;&#95;&#108;&#105;&#x62;&#x63;&#95;&#x73;&#116;&#97;&#114;&#x74;&#95;&#109;&#97;&#x69;&#110;&#64;&#103;&#x6f;&#116;&#x2e;&#x70;&#108;&#116;</a><br><br>   &emsp;&emsp;0x000000000040069c &lt;+28&gt;:addx0, x0, #0x38<br><br>   &emsp;&emsp;0x00000000004006a0 &lt;+32&gt;:ldrx1, [x0]<br><br>   &emsp;&emsp;0x00000000004006a4 &lt;+36&gt;:strx1, [x29,#56]<br><br>   &emsp;&emsp;0x00000000004006a8 &lt;+40&gt;:movx1, #0x0 &emsp;&emsp;// #0<br><br></font>
+
+<p>这5条指令是用于安全保障的。因为函数TestParam中声明了一个数组，因此有受到缓冲区溢出攻击的危险。在其他平台下或者之前版本中，需要在编译时显式使用-fstack-protector选项，才会增加这样的安全保障指令。而在飞腾ARM配置的编译器中，默认就增加了。</p>
+<p>其主要思路是在编译时生成一个随机化的值，如图中的_stack_guard保存在bss段中。在开始执行函数体时，把它从bss段中取出，放在栈的底部。然后执行函数。若有针对数组e的缓冲区溢出攻击，则_stack_guard就会被改写。在函数执行结束时，再把栈底部的值和bss段中的原始值相比较，若两者不同，就说明有攻击行为发生。</p>
+<p>这5条指令的功能就是从bss段中把_stack_guard的值放到栈的底部。需要注意的是，在查找时使用了相对寻址指令adrp。</p>
+<font color="#0000FF" size="2"><br>   &emsp;&emsp;0x00000000004006ac &lt;+44&gt;:ldrw1, [x29,#28]<br><br>   &emsp;&emsp;0x00000000004006b0 &lt;+48&gt;:ldrw0, [x29,#24]<br><br>   &emsp;&emsp;0x00000000004006b4 &lt;+52&gt;:addw0, w1, w0<br><br>   &emsp;&emsp;0x00000000004006b8 &lt;+56&gt;:strw0, [x29,#48]<br><br>   &emsp;&emsp;0x00000000004006bc &lt;+60&gt;:ldrw1, [x29,#20]<br><br>   &emsp;&emsp;0x00000000004006c0 &lt;+64&gt;:ldrw0, [x29,#16]<br><br>   &emsp;&emsp;0x00000000004006c4 &lt;+68&gt;:subw0, w1, w0<br><br>   &emsp;&emsp;0x00000000004006c8 &lt;+72&gt;:strw0, [x29,#52]<br><br></font>
+
+<p>这8条指令是使用形式参数进行运算，并把结果保存在数组中。数组中只有两个元素，被放置在靠近栈底的位置。</p>
+<font color="#0000FF" size="2"><br>   &emsp;&emsp;0x00000000004006cc &lt;+76&gt;:ldrw1, [x29,#20]<br><br>   &emsp;&emsp;0x00000000004006d0 &lt;+80&gt;:ldrw0, [x29,#16]<br><br>   &emsp;&emsp;0x00000000004006d4 &lt;+84&gt;:addw0, w1, w0<br><br>   &emsp;&emsp;0x00000000004006d8 &lt;+88&gt;:strw0, [x29,#44]<br></font>
+
+<p>这4条指令的作用是计算出f的值，并把它保存到栈中。</p>
+<font color="#0000FF" size="2"><br>   &emsp;&emsp;0x00000000004006dc &lt;+92&gt;:ldrw1, [x29,#48]<br><br>   &emsp;&emsp;0x00000000004006e0 &lt;+96&gt;:ldrw2, [x29,#52]<br><br>   &emsp;&emsp;0x00000000004006e4 &lt;+100&gt;:adrpx0, 0x400000<br><br>   &emsp;&emsp;0x00000000004006e8 &lt;+104&gt;:addx0, x0, #0x808<br><br>   &emsp;&emsp;0x00000000004006ec &lt;+108&gt;:ldrw3, [x29,#44]<br><br>   &emsp;&emsp;0x00000000004006f0 &lt;+112&gt;:bl0x400530 &lt;printf@plt&gt;<br></font>
+
+<p>这6条指令是负责准备参数寄存器x0、w1、w2和w3的值，并调用printf。x0中存放的是指向格式字符串的指针。</p>
+<font color="#0000FF" size="2"><br>   &emsp;&emsp;0x00000000004006f4 &lt;+116&gt;:adrpx0, 0x411000<a href="mailto:&#x5f;&#95;&#108;&#x69;&#98;&#x63;&#x5f;&#115;&#x74;&#97;&#x72;&#x74;&#95;&#x6d;&#97;&#x69;&#110;&#x40;&#103;&#x6f;&#116;&#x2e;&#x70;&#108;&#116;" target="_blank" rel="noopener">&#x5f;&#95;&#108;&#x69;&#98;&#x63;&#x5f;&#115;&#x74;&#97;&#x72;&#x74;&#95;&#x6d;&#97;&#x69;&#110;&#x40;&#103;&#x6f;&#116;&#x2e;&#x70;&#108;&#116;</a><br><br>   &emsp;&emsp;0x00000000004006f8 &lt;+120&gt;:addx0, x0, #0x38<br><br>   &emsp;&emsp;0x00000000004006fc &lt;+124&gt;:ldrx1, [x29,#56]<br><br>   &emsp;&emsp;0x0000000000400700 &lt;+128&gt;:ldrx0, [x0]<br><br>   &emsp;&emsp;0x0000000000400704 &lt;+132&gt;:eorx0, x1, x0<br><br>   &emsp;&emsp;0x0000000000400708 &lt;+136&gt;:cmpx0, xzr<br><br>   &emsp;&emsp;0x000000000040070c &lt;+140&gt;:b.eq0x400714 &lt;TestParam+148&gt;<br><br>   &emsp;&emsp;0x0000000000400710 &lt;+144&gt;:bl0x400500 &lt;__stack_chk_fail@plt&gt;<br></font>
+
+<p>这8条指令是比较_stack_guard的值与存放在bss段中的值是否相等，若相等，在跳到400714，继续执行TestParam函数，否则跳到_stack_chk_fail函数，处理缓冲区溢出发生的情况。</p>
+<font color="#0000FF" size="2"><br>   &emsp;&emsp;0x0000000000400714 &lt;+148&gt;:ldpx29, x30, [sp],#64<br><br>   &emsp;&emsp;0x0000000000400718 &lt;+152&gt;:ret<br><br></font>
+
+<p>这2条指令从栈中恢复x29和x30的值，并返回。需要注意的是ldp指令执行之后，sp的值自动增加了64。<br></p>
+<p><br></p>
+<p><br></p>
+<p><br></p>
+<p><br></p>
+<ul>
+<li style="list-style: none"><input type="checkbox"> 作者：马晓东</li>
+</ul>
+<center> <img src="/blogs/2018/05/17/ARMv8架构下程序运行时栈帧布局/ewm.jpg"> </center>
+
+
+<h4 id="欢迎关注微信公众号“perfxlab卧谈会”"><a href="#欢迎关注微信公众号“perfxlab卧谈会”" class="headerlink" title="欢迎关注微信公众号“perfxlab卧谈会”"></a><center>欢迎关注微信公众号“<font color="#0000FF" size="2">perfxlab卧谈会</font>”</center></h4><p><br></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/blogs/tags/ARMv8架构/" rel="tag"># ARMv8架构</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/blogs/2018/05/17/Git常用命令总结/" rel="prev" title="Git常用命令总结">
+                Git常用命令总结 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image"
+                src="/blogs/images/avatar.png"
+                alt="" />
+            
+              <p class="site-author-name" itemprop="name"></p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/blogs/archives/">
+              
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/blogs/tags/index.html">
+                  <span class="site-state-item-count">3</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#ARMv8架构下程序运行时栈帧布局"><span class="nav-number">1.</span> <span class="nav-text">ARMv8架构下程序运行时栈帧布局</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#欢迎关注微信公众号“perfxlab卧谈会”"><span class="nav-number">1.0.1.</span> <span class="nav-text">欢迎关注微信公众号“perfxlab卧谈会”</span></a></li></ol></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+<div class="powered-by">
+<i class="fa fa-user-md"></i><span id="busuanzi_container_site_uv">
+  本站访客数:<span id="busuanzi_value_site_uv"></span>
+</span>
+</div>
+<div class="copyright">&copy; <span itemprop="copyrightYear">2018</span>
+  <span class="with-love">
+    
+  </span>
+  <span class="author" itemprop="copyrightHolder"></span>
+
+  
+</div>
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/blogs/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/blogs/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/blogs/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/blogs/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/blogs/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/blogs/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/blogs/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/blogs/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/blogs/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/blogs/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/blogs/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/blogs/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/blogs/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
